@@ -41,7 +41,7 @@ dw_engine = db.create_engine(
 def get_dimStore_last_id(database):
     """ Function to get last_id in dim_store"""
     query = "SELECT max(store_id) AS last_id FROM dim_store"
-    tdf = pd.to_sql(query, database)
+    tdf = pd.read_sql(query, database)
     return tdf.iloc[0]['last_id']
 
 
@@ -60,7 +60,7 @@ def lookup_table_address(store_df, database):
     unique_ids = list(store_df.address_id.unique())
     unique_ids = list(filter(None, unique_ids))
 
-    query = "SELECT * FROM address WHERE address_in IN ({})".format(
+    query = "SELECT * FROM address WHERE address_id IN ({})".format(
         ','.join(map(str, unique_ids)))
     return pd.read_sql(query, database)
 
@@ -154,3 +154,56 @@ def load_dim_store(destination_df):
 ############################################
 # EXTRACT
 ############################################
+
+
+# Get last customer_id from dim_customer data warehouse
+last_id = get_dimStore_last_id(dw_engine)
+logger.debug('last_id={}'.format(last_id))
+
+# Extract the store table into a pandas DataFrame
+store_df = extract_table_store(last_id, db_engine)
+
+# If no records, then exit
+if store_df.shape[0] == 0:
+    raise Exception('No new record in source table')
+
+# Extract lookup table `address`
+address_df = lookup_table_address(store_df, db_engine)
+
+# Extract lookup table `city`
+city_df = lookup_table_city(address_df, db_engine)
+
+# Extract lookup table `country`
+country_df = lookup_table_country(city_df, db_engine)
+
+# Extract lookup table `staff`
+staff_df = lookup_table_staff(store_df, db_engine)
+
+############################################
+# TRANSFORM
+############################################
+
+# Join table `store` with `address`
+dim_store_df = join_store_address(store_df, address_df)
+
+# Join table `store` with `city`
+dim_store_df = join_store_city(dim_store_df, city_df)
+
+# Join table `store` with `country`
+dim_store_df = join_store_country(dim_store_df, country_df)
+
+# Join table `store` with `staff`
+dim_store_df = join_store_manager_staff(dim_store_df, staff_df)
+
+# Add start_date column
+dim_store_df['start_date'] = '2005-01-01'
+
+# Validate result
+dim_store_df = validate(store_df, dim_store_df)
+logger.debug('dim_store_df=\n{}'.format(dim_store_df.dtypes))
+############################################
+# LOAD
+############################################
+
+# Load dimension table `dim_store` to data warehouse
+load_dim_store(dim_store_df)
