@@ -75,7 +75,7 @@ else:
 logger.debug('start_date_range={}'.format(start_date_range))
 
 # Determine and range of generated date
-end_date_range = pd.datetime(2006, 1, 1).date()
+end_date_range = pd.datetime(2006, 2, 16).date()
 logger.debug('end_date_range={}'.format(end_date_range))
 
 # Check if date range is valid

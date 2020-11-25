@@ -98,7 +98,7 @@ def lookup_dim_movie(inventory_df, database):
 def lookup_dim_store(inventory_df, database):
     """ Function to lookup table `dim_store` """
     inventory_df = inventory_df.dropna(how='any', subset=['store_id'])
-    unique_ids = list(inventory_df.story_id.unique())
+    unique_ids = list(inventory_df.store_id.unique())
 
     query = "SELECT * FROM dim_store WHERE store_id IN ({})".format(
         ','.join(map(str, unique_ids)))
@@ -109,8 +109,8 @@ def join_payment_dim_customer(payment_df, dim_customer_df):
     """ Transform: join table payment and dim_customer """
     payment_df = pd.merge(payment_df, dim_customer_df,
                           left_on='customer_id', right_on='customer_id', how='left')
-    payment_df = payment_df[['payment_id', 'customer_key',
-                             'inventory_id', 'amount', 'payment_date', 'start_date', 'end_date']]
+    payment_df = payment_df[['payment_id', 'customer_key', 'customer_id',
+                             'rental_id', 'amount', 'payment_date', 'start_date', 'end_date']]
     payment_df = payment_df.rename({
         'start_date': 'customer_start_date',
         'end_date': 'customer_end_date'
@@ -141,7 +141,7 @@ def join_payment_inventory(payment_df, inventory_df):
 
 
 def join_payment_dim_movie(payment_df, dim_movie_df):
-    """ Transformation: join table `paymenr` and `dim_movie` """
+    """ Transformation: join table `payment` and `dim_movie` """
     payment_df = pd.merge(payment_df, dim_movie_df,
                           left_on='film_id', right_on='film_id', how='left')
     payment_df = payment_df[['payment_id', 'customer_key',
@@ -158,8 +158,9 @@ def join_payment_dim_store(payment_df, dim_store_df):
     payment_df = payment_df.rename(
         {'start_date': 'store_start_date', 'end_date': 'store_end_date'}, axis=1)
     # Make sure we only join with store record that is active at the time of transaction_date
-    payment_df = payment_df[(pd.to_datetime(payment_df.store_start_date) <= payment_df.payment_date) & ((pd.to_datetime(
-        payment_df.store_end_date) >= payment_df.payment_date) | (payment_df.store_end_date.isnull())) | (payment_df.store_key.isnull())]
+    payment_df = payment_df[(pd.to_datetime(payment_df.store_start_date) <= payment_df.payment_date)
+                            & ((pd.to_datetime(payment_df.store_end_date) >= payment_df.payment_date) | (payment_df.store_end_date.isnull()))
+                            | (payment_df.store_key.isnull())]
     return payment_df
 
 
@@ -195,7 +196,7 @@ def validate(source_df, destination_df):
         raise ValueError(
             'Transformation result is not valid: column customer_key has NaN value'
         )
-        return destination_df
+    return destination_df
 
 
 def load_dim_payment(destination_df):
@@ -262,13 +263,13 @@ logger.debug('dim_payment_df=\n{}'.format(dim_payment_df))
 dim_payment_df = add_date_key(dim_payment_df)
 logger.debug('dim_payment_df=\n{}'.format(dim_payment_df))
 
-# Rename and remove 
+# Rename and remove
 dim_payment_df = rename_remove_columns(dim_payment_df)
 logger.debug('dim_payment_df=\n{}'.format(dim_payment_df))
 
 # Validate result
 dim_payment_df = validate(payment_df, dim_payment_df)
-logger.debug('dim_payment_df=\n{}'.format(dim_payment_df))
+logger.debug('dim_payment_df=\n{}'.format(dim_payment_df.dtypes))
 
 ############################################
 # LOAD
